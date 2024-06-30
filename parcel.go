@@ -19,7 +19,7 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 		sql.Named("client", p.Client),
 		sql.Named("status", p.Status),
 		sql.Named("address", p.Address),
-		sql.Named("created_at", p.Created_At))
+		sql.Named("created_at", p.CreatedAt))
 	if err != nil {
 		return 0, fmt.Errorf("failed to add parcel info: %w", err)
 	}
@@ -36,9 +36,9 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 func (s ParcelStore) Get(number int) (Parcel, error) {
 	p := Parcel{}
 	err := s.db.QueryRow("SELECT number, client,status,address,created_at FROM parcel WHERE number = ?", number).Scan(
-		&p.Number, &p.Client, &p.Status, &p.Address, &p.Created_At)
+		&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
-		return p, fmt.Errorf("failed to query parcel info with number %d: %w", number, err)
+		return Parcel{}, fmt.Errorf("failed to query parcel info with number %d: %w", number, err)
 	}
 	return p, nil
 }
@@ -49,23 +49,23 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	rows, err := s.db.Query("SELECT number, client,status,address,created_at FROM parcel WHERE client = ?", client)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return res, fmt.Errorf("parcel with client %d does not exist", client)
+			return nil, fmt.Errorf("parcel with client %d does not exist", client)
 		}
-		return res, fmt.Errorf("failed to query parcel info with client %d: %w", client, err)
+		return nil, fmt.Errorf("failed to query parcel info with client %d: %w", client, err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var p Parcel
-		err := rows.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.Created_At)
+		err := rows.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 		if err != nil {
-			return res, fmt.Errorf("failed to read parcel info with client %d: %w", client, err)
+			return nil, fmt.Errorf("failed to read parcel info with client %d: %w", client, err)
 		}
 		res = append(res, p)
 	}
 
 	if err = rows.Err(); err != nil {
-		return res, fmt.Errorf("error during rows iteration: %w", err)
+		return nil, fmt.Errorf("error during rows iteration: %w", err)
 	}
 	return res, nil
 }
@@ -79,24 +79,12 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 	return nil
 }
 
-// SetAddress реализет обновление адреса в таблице parcel при статусе registered
+// SetAddress реализует обновление адреса в таблице parcel при статусе registered
 func (s ParcelStore) SetAddress(number int, address string) error {
-	var p Parcel
-	err := s.db.QueryRow("SELECT status FROM parcel WHERE number = ?", number).Scan(&p.Status)
+	_, err := s.db.Exec("UPDATE parcel SET address = ? WHERE number = ? AND status = ?",
+		address, number, ParcelStatusRegistered)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("parcel with number %d does not exist", number)
-		}
-		return fmt.Errorf("failed to query parcel with number %d: %w", number, err)
-	}
-
-	if p.Status == ParcelStatusRegistered {
-		_, err := s.db.Exec("UPDATE parcel SET address = ? WHERE number = ?", address, number)
-		if err != nil {
-			return fmt.Errorf("failed to update address for number %d: %w", number, err)
-		}
-	} else {
-		return fmt.Errorf("parcel with number %d is not registered", number)
+		return fmt.Errorf("failed to update address for number %d: %w", number, err)
 	}
 
 	return nil
@@ -104,22 +92,10 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 
 // Delete реализует удаление строки из таблицы parcel при статусе registered
 func (s ParcelStore) Delete(number int) error {
-	var p Parcel
-	err := s.db.QueryRow("SELECT status FROM parcel WHERE number = ?", number).Scan(&p.Status)
+	_, err := s.db.Exec("DELETE FROM parcel WHERE number = ? AND status = ?",
+		number, ParcelStatusRegistered)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("parcel with number %d does not exist", number)
-		}
-		return fmt.Errorf("failed to query parcel with number %d: %w", number, err)
-	}
-
-	if p.Status == ParcelStatusRegistered {
-		_, err := s.db.Exec("DELETE FROM parcel WHERE number = ?", number)
-		if err != nil {
-			return fmt.Errorf("failed to delete parcel info with number %d: %w", number, err)
-		}
-	} else {
-		return fmt.Errorf("parcel with number %d is not registered", number)
+		return fmt.Errorf("failed to delete parcel info with number %d: %w", number, err)
 	}
 
 	return nil

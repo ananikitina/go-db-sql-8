@@ -22,10 +22,10 @@ var (
 // getTestParcel возвращает тестовую посылку
 func getTestParcel() Parcel {
 	return Parcel{
-		Client:     1000,
-		Status:     ParcelStatusRegistered,
-		Address:    "test",
-		Created_At: time.Now().UTC().Format(time.RFC3339),
+		Client:    1000,
+		Status:    ParcelStatusRegistered,
+		Address:   "test",
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 }
 
@@ -47,10 +47,9 @@ func TestAddGetDelete(t *testing.T) {
 	// get (отсутствие ошибки, значения полей в объекте = значения полей в parcel)
 	get, err := store.Get(number)
 	require.NoError(t, err, "failed to get parcel")
-	assert.Equal(t, parcel.Client, get.Client)
-	assert.Equal(t, parcel.Address, get.Address)
-	assert.Equal(t, parcel.Status, get.Status)
-	assert.Equal(t, parcel.Created_At, get.Created_At)
+
+	parcel.Number = number // Присваиваем ожидаемой структуре фактический номер
+	assert.Equal(t, parcel, get, "parcel fields should be equal")
 
 	// delete (отсутствие ошибки, посылку больше нельзя получить из БД)
 	err = store.Delete(number)
@@ -80,7 +79,8 @@ func TestSetAddress(t *testing.T) {
 	require.NoError(t, err, "failed to set new address")
 
 	// check
-	get, _ := store.Get(number)
+	get, err := store.Get(number)
+	require.NoError(t, err, "failed to check for address update")
 	assert.Equal(t, newAddress, get.Address)
 }
 
@@ -100,12 +100,13 @@ func TestSetStatus(t *testing.T) {
 	assert.NotEmpty(t, number, "parcel number should not be empty")
 
 	// set status (отсутствие ошибки)
-	newStatus := "Delivered"
+	newStatus := ParcelStatusDelivered
 	err = store.SetStatus(number, newStatus)
 	require.NoError(t, err, "failed to set parcel status")
 
 	// check
-	get, _ := store.Get(number)
+	get, err := store.Get(number)
+	require.NoError(t, err, "failed to check for status update")
 	assert.Equal(t, newStatus, get.Status)
 }
 
