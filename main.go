@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -22,6 +23,7 @@ type Parcel struct {
 	CreatedAt string
 }
 
+// Структура ParcelService реализует логику работы с посылками
 type ParcelService struct {
 	store ParcelStore
 }
@@ -30,6 +32,7 @@ func NewParcelService(store ParcelStore) ParcelService {
 	return ParcelService{store: store}
 }
 
+// Register регистрирует новую посылку
 func (s ParcelService) Register(client int, address string) (Parcel, error) {
 	parcel := Parcel{
 		Client:    client,
@@ -51,6 +54,7 @@ func (s ParcelService) Register(client int, address string) (Parcel, error) {
 	return parcel, nil
 }
 
+// PrintClientParcels отображает посылки конкретного клиента
 func (s ParcelService) PrintClientParcels(client int) error {
 	parcels, err := s.store.GetByClient(client)
 	if err != nil {
@@ -67,6 +71,7 @@ func (s ParcelService) PrintClientParcels(client int) error {
 	return nil
 }
 
+// NextStatus отображает изменение статуса посылки
 func (s ParcelService) NextStatus(number int) error {
 	parcel, err := s.store.Get(number)
 	if err != nil {
@@ -97,9 +102,13 @@ func (s ParcelService) Delete(number int) error {
 }
 
 func main() {
-	// настройте подключение к БД
+	db, err := sql.Open("sqlite", "tracker.db")
+	if err != nil {
+		log.Fatalf("failed to connect to database:%v", err)
+	}
+	defer db.Close()
 
-	store := // создайте объект ParcelStore функцией NewParcelStore
+	store := NewParcelStore(db)
 	service := NewParcelService(store)
 
 	// регистрация посылки
